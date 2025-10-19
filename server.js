@@ -16,8 +16,8 @@ app.get('/',(req,res)=>{
     res.send('Server is live');
 })
 
-const userControllers = require('./controllers/usercontrollers');
-app.use('/user',userControllers);
+const userRoutes = require('./routes/userRoutes');
+app.use('/user',userRoutes);
 
 app.listen(port,()=>{
     console.log(`Example app listening on ${port}`);
