@@ -1,15 +1,11 @@
-const express = require('express');
-const router = express.Router();
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const key = process.env.JWT_SECRET_KEY;
 const user = require('../models/user');
-const jwtauthmiddleware = require('../middlewares/jwtauthmiddleware');
 const genrateToken = require('../utils/generatetoken');
 const {addTokentoBlacklist, blacklistHasToken} = require('../utils/blacklist');
 
-
-router.post('/signup', async (req,res)=>{
+const signupUser = async (req,res)=>{
     try{
         const datafromClient = req.body;
         const userName = datafromClient.name;
@@ -33,23 +29,23 @@ router.post('/signup', async (req,res)=>{
             httpOnly:true,
             secure:true,
             sameSite:'strict',
-            maxAge:3600*24*10
+            maxAge:3600*24*10*1000
         })
         
         res.status(200).json({response:saveuser});
     }catch(err){
         res.status(500).json({error:'Internal Server error'});
     }
-})
+};
 
-router.post('/login', async (req,res)=>{
+const loginUser = async (req,res)=>{
     try{
         const {username,password} = req.body;
-        const finduser = await shop.findOne({name:username});
+        const finduser = await user.findOne({name:username});
 
         if(!finduser) return res.status(401).json({error:'Invalid username or password'});
 
-        const correctPassword = await findshop.comparePassword(password);
+        const correctPassword = await finduser.comparePassword(password);
 
         if(!correctPassword) return res.status(401).json({error:'Invalid username or password'});
 
@@ -63,7 +59,7 @@ router.post('/login', async (req,res)=>{
             httpOnly:true,
             secure:true,
             sameSite:'strict',
-            maxAge:3600*24*10
+            maxAge:3600*24*10*1000
         })
 
         res.status(200).json({message:'Login is successful', payload:payload});
@@ -72,9 +68,9 @@ router.post('/login', async (req,res)=>{
         console.log(err)
         res.status(500).json({err:'Internal Server error'});
     }
-})
+}
 
-router.post('/logout',jwtauthmiddleware, async (req,res)=>{
+const logoutUser = async (req,res)=>{
     try{
         const authHeader = req.headers.authorization;
         const token = authHeader.split(' ')[1];
@@ -98,6 +94,6 @@ router.post('/logout',jwtauthmiddleware, async (req,res)=>{
         console.log(err);
         res.status(500).json({err:'Internal Server Error'})
     }
-})
+}
 
-module.exports = router;
+module.exports = {signupUser, loginUser, logoutUser};
