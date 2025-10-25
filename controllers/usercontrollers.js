@@ -1,5 +1,6 @@
 require('dotenv').config();
 const user = require('../models/user');
+const jwt = require('jsonwebtoken');
 
 const signupUser = async (req,res)=>{
     try{
@@ -99,12 +100,64 @@ const getUser = async (req,res)=>{
     }
 }
 
+const refreshAccessToken = async (req,res)=>{
+    try{
+        const incommingRefreshToken = req.body.refreshToken || res.cookies?.refreshToken || 
+        (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')
+            ? req.headers.authorization.split(' ')[1]
+            : req.headers.authorization);
+
+        if(!incommingRefreshToken){
+            return res.status(402).json({err:'unauthorized'});
+        }
+
+        const decoded = await jwt.verify(
+            incommingRefreshToken,
+            process.env.REFRESH_TOKEN_SECRET
+        )
+
+        const findUser = await user.findById(decoded?._id);
+
+        if(!findUser || findUser.refreshToken!==incommingRefreshToken){
+            return res.status(404).json({error:'User not found'});
+        } 
+
+        const newRefreshToken = findUser.generateRefreshToken();
+        const newAccessToken = findUser.generateAccessToken();
+
+        findUser.refreshToken = newRefreshToken;
+        await findUser.save({
+            validateBeforeSave: false
+        });
+
+        const cookieOptions = {
+            httpOnly:true,
+            secure:true
+        }
+
+        res.status(200).
+        cookie('accessToken',newAccessToken, cookieOptions).
+        cookie('refreshToken',newRefreshToken, cookieOptions).
+        json({
+            newAccessToken,
+            newRefreshToken,
+            message:'accessToken is refreshed'
+        })
+
+    }catch(err){
+        res.status(500).json({err:'Internal Server error'});
+    }
+}
+
 module.exports = {
     signupUser, 
     loginUser, 
     logoutUser,
-    getUser
+    getUser,
+    refreshAccessToken
 };
+
+
 
 
 
