@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const port = process.env.LOCAL_DB_URL;
+const port = process.env.DB_URL;
 
 mongoose.connect(port,{
     useUnifiedTopology : true,

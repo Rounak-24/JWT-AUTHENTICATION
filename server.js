@@ -5,6 +5,8 @@ const port = process.env.port;
 const db = require('./config/db');
 const bodyParser = require('body-parser');
 app.use(bodyParser.json());
+const cookieParser = require('cookie-parser');
+app.use(cookieParser());
 
 const logRequest = (req,res,next)=>{
     console.log(`${new Date().toLocaleString()} request made to : ${req.originalUrl}`);
@@ -13,7 +15,7 @@ const logRequest = (req,res,next)=>{
 app.use(logRequest);
 
 app.get('/',(req,res)=>{
-    res.send('Server is live');
+    res.send('Server is live!');
 })
 
 const userRoutes = require('./routes/userRoutes');

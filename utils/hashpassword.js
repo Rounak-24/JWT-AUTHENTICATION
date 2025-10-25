@@ -9,7 +9,9 @@ const hashPassword = async function (next) {
         }
 
         const salt = await bcrypt.genSalt(10);
-        const hashPassword = await bcrypt.hash(this.password, salt);
+        const hashedPassword = await bcrypt.hash(this.password, salt);
+
+        user.password = hashedPassword
         next();
     }catch(err){
         next(err);
