@@ -29,6 +29,7 @@ const signupUser = async (req,res)=>{
         })
 
     }catch(err){
+        console.log(err);
         res.status(500).json({error:'Internal Server error'});
     }
 };
@@ -93,7 +94,7 @@ const logoutUser = async (req,res)=>{
 
 const getUser = async (req,res)=>{
     try{
-        const findUser = await user.findById(req.params.id);
+        const findUser = await user.findById(req.user?._id);
         return res.status(200).json({findUser});
     }catch(err){
         res.status(500).json({err:'Internal Server error'});
@@ -149,12 +150,38 @@ const refreshAccessToken = async (req,res)=>{
     }
 }
 
+const changePassword = async(req,res)=>{
+    try{
+        const {oldPassword, newPassword, confirmPassword} = req.body;
+
+        if(!oldPassword || !newPassword || !confirmPassword) return res.status(400).json({error:'all fields are required'});
+
+        const findUser = await user.findById(req.user?._id);
+        if(!findUser) res.status(404).json({error:'user not found'});
+
+        if(!await findUser.comparePassword(oldPassword)){
+            return res.status(400).json({error:'Incorrect current password'});
+        }
+
+        if(newPassword!==confirmPassword) return res.status(400).json({error:'confirm password accurately'});
+
+        findUser.password = newPassword;
+        await findUser.save();
+
+        res.status(200).json({message: 'password changed successfully'});
+
+    }catch(err){
+        res.status(500).json({err:'Internal Server error'});
+    }
+}
+
 module.exports = {
     signupUser, 
     loginUser, 
     logoutUser,
     getUser,
-    refreshAccessToken
+    refreshAccessToken,
+    changePassword
 };
 
 
