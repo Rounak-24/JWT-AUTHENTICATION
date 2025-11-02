@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 const hashPassword = require('../utils/hashpassword');
 const comparePassword = require('../utils/comparepassword');
 const jwt = require('jsonwebtoken');
@@ -7,7 +8,16 @@ require('dotenv').config();
 const userSchema = new mongoose.Schema({
     name:{type:String, required:true},
     password:{type:String,required:true},
-    refreshToken:{type:String}
+    refreshToken:{type:String},
+    
+    email:{type:String},
+    verifiedEmail:{type:Boolean, default:false},
+    emailVerifyToken:{type:String},
+    emailVerifyTokenExpiry:{type:Date},
+
+    forgotPassToken:{type:String},
+    forgotPassTokenExpiry:{type:Date}
+
 },{timestamps:true});
 
 userSchema.pre('save', hashPassword);
@@ -36,6 +46,18 @@ userSchema.methods.generateRefreshToken = function(){
             expiresIn:process.env.REFRESH_TOKEN_EXPIRY
         }
     )
+}
+
+userSchema.methods.generateTempToken = function(){
+    const unHashedTempToken = crypto.randomBytes(20).toString('hex');
+
+    const hashedTempToken = crypto.createHash('sha256')
+        .update(unHashedTempToken)
+        .digest('hex')
+
+    const tempTokenExpiry = Date.now() + (20*60*1000);
+
+    return {unHashedTempToken, hashedTempToken, tempTokenExpiry};
 }
 
 const user = mongoose.model('users',userSchema);

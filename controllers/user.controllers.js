@@ -1,6 +1,14 @@
-require('dotenv').config();
 const user = require('../models/user');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+require('dotenv').config();
+
+const {
+    userVerficationContent,
+    resetPasswordContent,
+    sendEmail
+
+} = require('../utils/mail');
 
 const signupUser = async (req,res)=>{
     try{
@@ -175,43 +183,131 @@ const changePassword = async(req,res)=>{
     }
 }
 
+const sendEmailVerification = async (req,res)=>{
+    try{
+        const findUser = await user.findById(req.user?._id);
+        if(!findUser) return res.status(404).json({error:'user not found'});
+        
+        const {unHashedTempToken, hashedTempToken, tempTokenExpiry} = findUser.generateTempToken();
+
+        findUser.emailVerifyToken = hashedTempToken;
+        findUser.emailVerifyTokenExpiry = tempTokenExpiry;
+
+        await findUser.save();
+
+        await sendEmail({
+            email:findUser?.email,
+            subject:'Please verify your email',
+            mailgenContent:userVerficationContent(findUser?.name,
+                `${req.protocol}://${req.get('host')}user/verify-email/${unHashedTempToken}`
+            )
+        })
+        
+        res.status(200).json({message: 'Email sent successfully'});
+
+    }catch(err){
+        res.status(500).json({err:'Server error while sending verification mail'});
+    }
+}
+
+const verifyEmail = async (req,res)=>{
+    try{
+        const {unHashedTempToken} = req.params;
+        if(!unHashedTempToken) return res.status(404).json({error:'Verification token not found'});
+
+        const hashedToken = crypto
+            .createHash('sha256')
+            .update(unHashedTempToken)
+            .digest('hex')
+
+        const findUser = await user.findOne({
+            emailVerifyToken:hashedToken,
+            emailVerifyTokenExpiry:{$gt: Date.now()}
+        })
+
+        if(!findUser) return res.status(404).json({error:'Verification token is invalid or expired'}); 
+        
+        findUser.verifiedEmail = true;
+        findUser.emailVerifyToken = undefined;
+        findUser.emailVerifyTokenExpiry = undefined;
+
+        await findUser.save();
+        
+        res.status(200).json({message:'Email verified successfully'});
+
+    }catch(err){
+        res.status(500).json({err:'Server error while email verification'});
+    }
+}
+
+const forgotPassRequest = async (req,res)=>{
+    try{
+        const {email} = req.body;
+
+        const findUser = await user.findOne({email:email});
+        if(!findUser) return res.status(404).json({error:'user not found'});
+
+        const {unHashedTempToken, hashedTempToken, tempTokenExpiry} = findUser.generateTempToken();
+
+        findUser.forgotPassToken = hashedTempToken;
+        findUser.forgotPassTokenExpiry = tempTokenExpiry;
+
+        await findUser.save();
+
+        await sendEmail({
+            email:findUser?.email,
+            subject:'Reset your Password',
+            mailgenContent:resetPasswordContent(findUser?.name,
+                `${process.env.FORGOT_PASSWORD_REDIRECT_URL}/${unHashedTempToken}`
+            )
+        }) 
+        
+        res.status(200).json({message: ' Forgot password mail sent successfully'});
+
+    }catch(err){
+        res.status(500).json({err:'Server error while sending forgot password mail'});
+    }
+}
+
+const resetForgotPassword = async (req,res)=>{
+    try{
+        const {newPassword} = req.body;
+        const {unHashedForgotPassToken} = req.params;
+
+        const hashedToken = crypto
+            .createHash('sha256')
+            .update(unHashedForgotPassToken)
+            .digest('hex')
+
+        const findUser = await user.findOne({
+            forgotPassToken:hashedToken,
+            forgotPassTokenExpiry:{$gt: Date.now()}
+        })
+
+        if(!findUser) return res.status(404).json({error:'Forgot pass token is invalid or expired'});
+
+        findUser.password = newPassword;
+        findUser.forgotPassToken = undefined;
+        findUser.forgotPassTokenExpiry = undefined;
+
+        await findUser.save();
+        
+        res.status(200).json({message:'password has been changed successfully'});
+
+    }catch(err){
+        res.status(500).json({err:'Server error while reseting password'});
+    }
+}
+
 module.exports = {
     signupUser, 
     loginUser, 
     logoutUser,
     getUser,
     refreshAccessToken,
-    changePassword
+    changePassword,
+    sendEmailVerification,
+    verifyEmail,
+    forgotPassRequest,
+    resetForgotPassword
 };
-
-
-
-
-
-
-
-// const logoutUser = async (req,res)=>{
-//     try{
-//         const authHeader = req.headers.authorization;
-//         const token = authHeader.split(' ')[1];
-
-//         if(!token) return res.status(401).json({error:'No token'});
-
-//         const decoded = jwt.verify(token,key);
-
-//         let ttlMs = 0;
-//         if(decoded && decoded.exp){
-//             ttlMs = (decoded.exp*1000) - Date.now();
-//             if(ttlMs<0) ttlMs = 0;
-//         }
-
-//         addTokentoBlacklist(token,ttlMs);
-//         res.clearCookie('token');
-
-//         res.status(200).json({message:'Logged out Successfully'});
-
-//     }catch(err){
-//         console.log(err);
-//         res.status(500).json({err:'Internal Server Error'})
-//     }
-// }
